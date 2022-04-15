@@ -1,7 +1,7 @@
-This project is discontinued.\
-Most of the code is very bad, if you copy something make sure you fix it up.\
-Thanks to the ones who have supported me during the making of this
+This project was discontinued by RoseGold as they are going to the army and won't be able to work on it. We decided to fork it and continue development after the server got deleted. Original Repository: https://github.com/RoseGoldIsntGay/RGA
 
+"Most of the code is very bad, if you copy something make sure you fix it up.\
+Thanks to the ones who have supported me during the making of this." - RoseGold
 # RoseGoldAddons Feature List:
 ### Keybinds:
 All the features below are clickable to open a drop-down with more information inside.
