@@ -4,11 +4,14 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import gg.essential.api.EssentialAPI;
+import jline.internal.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.event.ClickEvent;
+import net.minecraft.network.play.server.S01PacketJoinGame;
 import net.minecraft.util.ChatComponentText;
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -22,12 +25,16 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.lwjgl.input.Keyboard;
 import rosegoldaddons.commands.*;
+import rosegoldaddons.events.ReceivePacketEvent;
 import rosegoldaddons.features.*;
 import rosegoldaddons.utils.*;
 
+import java.awt.*;
 import java.io.*;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -59,11 +66,15 @@ public class Main {
     private static boolean oldanim = false;
     public static boolean init = false;
     public static boolean mithrilMacro = false;
-    private boolean issue = false;
     public static boolean pauseCustom = false;
+    private static JsonArray funnynames;
+    private static JsonArray funnymessages;
+    private static JsonObject customNames;
+    private static JsonObject legacyNames;
+    private static JsonObject rgaRanks;
+    private static boolean firstLogin = true;
 
     public static final Minecraft mc = Minecraft.getMinecraft();
-    public static JsonObject rga;
 
     String info = "Hello decompiler! this is just some funny stuff, you do not have to worry about it!";
     private String[] cumsters = null;
@@ -83,16 +94,38 @@ public class Main {
         }
 
         try {
-            rga = getJson("https://gist.githubusercontent.com/RoseGoldIsntGay/2d15ef10d53629455a40f5c027db1dfb/raw/").getAsJsonObject();
+            funnynames = getJson("https://rga.ner.gg/v1/funnynames").getAsJsonObject().get("names").getAsJsonArray();
         } catch (Exception e) {
             e.printStackTrace();
-            issue = true;
+            funnynames = new JsonArray();
+        }
+
+        try {
+            funnymessages = getJson("https://rga.ner.gg/v1/funnymessages").getAsJsonObject().get("messages").getAsJsonArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+            funnymessages = new JsonArray();
+        }
+
+        try {
+            JsonObject names = getJson("https://rga.ner.gg/v1/names").getAsJsonObject();
+            customNames = names.get("names").getAsJsonObject();
+            legacyNames = names.get("legacy").getAsJsonObject();
+        } catch (Exception e) {
+            e.printStackTrace();
+            customNames = new JsonObject();
+        }
+
+        try {
+            rgaRanks = getJson("https://rga.ner.gg/v1/ranks").getAsJsonObject().get("ranks").getAsJsonObject();
+        } catch (Exception e) {
+            e.printStackTrace();
+            rgaRanks = new JsonObject();
         }
     }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
-        if (issue) return;
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new AutoReady());
         MinecraftForge.EVENT_BUS.register(new OpenSkyblockGui());
@@ -134,7 +167,6 @@ public class Main {
         ClientCommandHandler.instance.registerCommand(new AllEntities());
         ClientCommandHandler.instance.registerCommand(new SexPlayer());
 
-        JsonArray funnynames = rga.get("funnynames").getAsJsonArray();
         cumsters = new String[funnynames.size()];
         Iterator<JsonElement> fn = funnynames.iterator();
         int count = 0;
@@ -143,7 +175,7 @@ public class Main {
             cumsters[count] = name.getAsString();
             count++;
         }
-        JsonArray funnymessages = rga.get("funnymessages").getAsJsonArray();
+
         ILILILLILILLILILILL = new String[funnymessages.size()];
         Iterator<JsonElement> fm = funnymessages.iterator();
         count = 0;
@@ -153,16 +185,14 @@ public class Main {
             count++;
         }
 
-        JsonObject replacions = rga.get("replacions").getAsJsonObject();
-        Set<Map.Entry<String, JsonElement>> set = replacions.entrySet();
+        Set<Map.Entry<String, JsonElement>> set = rgaRanks.entrySet();
 
         set.forEach(stringJsonElementEntry -> {
             names.put(stringJsonElementEntry.getKey(), stringJsonElementEntry.getValue().getAsString().replace("&", "§"));
             System.out.println(stringJsonElementEntry.getKey()+": "+stringJsonElementEntry.getValue().getAsString().replace("&", "§"));
         });
 
-        replacions = rga.get("ranks").getAsJsonObject();
-        set = replacions.entrySet();
+        set = customNames.entrySet();
 
         set.forEach(stringJsonElementEntry -> {
             ranks.put(stringJsonElementEntry.getKey(), stringJsonElementEntry.getValue().getAsString().replace("&", "§"));
@@ -285,6 +315,20 @@ public class Main {
                 e.printStackTrace();
             }
             display = null;
+        }
+    }
+
+    @SubscribeEvent
+    public void onPacket(ReceivePacketEvent event) {
+        if (event.packet instanceof S01PacketJoinGame) {
+            if (firstLogin) {
+                firstLogin = false;
+                for (Map.Entry<String, JsonElement> hash : legacyNames.entrySet()) {
+                    if (DigestUtils.sha256Hex(mc.getSession().getUsername() + mc.getSession().getUsername()).equals(hash.getKey())) {
+                        notify("Click here to join the discord server and verify to reclaim your custom name.", "https://discord.gg/mdfmj8mpUE", 15);
+                    }
+                }
+            }
         }
     }
 
@@ -419,6 +463,27 @@ public class Main {
         }
 
         return content.toString();
+    }
+
+    public static void notify(String message, @Nullable int duration) {
+        if (duration == 0) {
+            duration = 5;
+        }
+        EssentialAPI.getNotifications().push("RoseGoldAddons", message, duration);
+    }
+
+    public static void notify(String message, String url, @Nullable int duration) {
+        if (duration == 0) {
+            duration = 5;
+        }
+        EssentialAPI.getNotifications().push("RoseGoldAddons", message, duration, () -> {
+            try {
+                Desktop.getDesktop().browse(new URL(url).toURI());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        });
     }
 
 }
