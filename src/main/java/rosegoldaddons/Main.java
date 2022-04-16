@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import gg.essential.api.EssentialAPI;
-import jline.internal.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.GameSettings;
@@ -34,7 +33,6 @@ import rosegoldaddons.utils.*;
 
 import java.awt.*;
 import java.io.*;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Files;
@@ -185,14 +183,14 @@ public class Main {
             count++;
         }
 
-        Set<Map.Entry<String, JsonElement>> set = rgaRanks.entrySet();
+        Set<Map.Entry<String, JsonElement>> set = customNames.entrySet();
 
         set.forEach(stringJsonElementEntry -> {
             names.put(stringJsonElementEntry.getKey(), stringJsonElementEntry.getValue().getAsString().replace("&", "§"));
             System.out.println(stringJsonElementEntry.getKey()+": "+stringJsonElementEntry.getValue().getAsString().replace("&", "§"));
         });
 
-        set = customNames.entrySet();
+        set = rgaRanks.entrySet();
 
         set.forEach(stringJsonElementEntry -> {
             ranks.put(stringJsonElementEntry.getKey(), stringJsonElementEntry.getValue().getAsString().replace("&", "§"));
@@ -284,6 +282,20 @@ public class Main {
     }
 
     @SubscribeEvent
+    public void onPacket(ReceivePacketEvent event) {
+        if (event.packet instanceof S01PacketJoinGame) {
+            if (firstLogin) {
+                firstLogin = false;
+                for (Map.Entry<String, JsonElement> hash : legacyNames.entrySet()) {
+                    if (DigestUtils.sha256Hex(mc.getSession().getUsername() + mc.getSession().getUsername()).equals(hash.getKey())) {
+                        notify("Click here to join the discord server and verify to reclaim your custom name.", "https://discord.gg/mdfmj8mpUE", 15);
+                    }
+                }
+            }
+        }
+    }
+
+    @SubscribeEvent
     public void tick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.START) return;
         if(mc.thePlayer == null || mc.theWorld == null) return;
@@ -315,20 +327,6 @@ public class Main {
                 e.printStackTrace();
             }
             display = null;
-        }
-    }
-
-    @SubscribeEvent
-    public void onPacket(ReceivePacketEvent event) {
-        if (event.packet instanceof S01PacketJoinGame) {
-            if (firstLogin) {
-                firstLogin = false;
-                for (Map.Entry<String, JsonElement> hash : legacyNames.entrySet()) {
-                    if (DigestUtils.sha256Hex(mc.getSession().getUsername() + mc.getSession().getUsername()).equals(hash.getKey())) {
-                        notify("Click here to join the discord server and verify to reclaim your custom name.", "https://discord.gg/mdfmj8mpUE", 15);
-                    }
-                }
-            }
         }
     }
 
@@ -465,17 +463,11 @@ public class Main {
         return content.toString();
     }
 
-    public static void notify(String message, @Nullable int duration) {
-        if (duration == 0) {
-            duration = 5;
-        }
+    public static void notify(String message, int duration) {
         EssentialAPI.getNotifications().push("RoseGoldAddons", message, duration);
     }
 
-    public static void notify(String message, String url, @Nullable int duration) {
-        if (duration == 0) {
-            duration = 5;
-        }
+    public static void notify(String message, String url, int duration) {
         EssentialAPI.getNotifications().push("RoseGoldAddons", message, duration, () -> {
             try {
                 Desktop.getDesktop().browse(new URL(url).toURI());
